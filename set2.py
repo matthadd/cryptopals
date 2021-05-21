@@ -26,7 +26,6 @@ def pkcs7(plaintext, blocksize=16):
 
 def strip_pkcs7(plaintext, blocksize=16):
     possible_padding = plaintext[-1]
-    print(possible_padding)
     for i in range(1, possible_padding + 1):
         if plaintext[-i] != possible_padding:
             return False
@@ -298,54 +297,39 @@ class Oracle():
         dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg
         YnkK'''))
 
-#
-# def attack_on_ECB_harder():
-#     working_block_number = len(append_oracle(key, b''))
-#     oracle = Oracle()
-#     blocksize = 16
-#
-#     # get radical size
-#
-#     # get the blocksize by the feading the oracle the same bytes
-#     radicalsize = 0
-#     first_cipher_chunks = b'a'
-#     precent_cipher_chunks = b'b'
-#     while first_cipher_chunks != precent_cipher_chunks and radicalsize <= 2*blocksize:
-#         print(radicalsize)
-#         print(precent_cipher_chunks)
-#         print(first_cipher_chunks)
-#         radicalsize += 1
-#         precent_cipher_chunks = first_cipher_chunks
-#         padding = b'A' * radicalsize
-#         ciphertext = oracle.encrypt(padding)
-#         print('ciphertext:', ciphertext)
-#         first_cipher_chunks = [ciphertext[i:i + blocksize] for i in range(0, len(ciphertext), blocksize)][0]
-#     print('radical is {}'.format(radicalsize))
-#
-#     guess_char = b''  # delete
-#     guess_chars = b''
-#     for working_block in range(working_block_number):
-#         padding = b'A' * (blocksize - 1)
-#         for j in range(blocksize):
-#             attack_dict = dict()
-#             append_padding = padding[j:]
-#             for i in range(2 ** 8):
-#                 current_append_padding = append_padding + guess_chars + bytes([i])
-#                 cipherblock_i = oracle.encrypt(current_append_padding)[
-#                                 working_block * blocksize:blocksize * (1 + working_block)]
-#                 attack_dict[cipherblock_i] = bytes([i])
-#             cible_cipherblok = oracle.encrypt(append_padding)[
-#                                working_block * blocksize:blocksize * (1 + working_block)]
-#             guess_char = attack_dict.get(cible_cipherblok, None)
-#             if guess_char is None:
-#                 return guess_chars
-#             guess_chars += guess_char
-#             print(guess_char.decode(), end='')
-#     return guess_chars
-#
-#
+
+def attack_on_ECB_harder():
+    oracle = Oracle()
+    blocksize = 16
+
+    radicalsize = 0
+    while oracle.encrypt(b'A' * radicalsize)[:blocksize] != oracle.encrypt(b'A' * (radicalsize + 1))[:blocksize]:
+        radicalsize += 1
+    #radicalsize = (blocksize - radicalsize) % blocksize
+
+    working_block_number = len(oracle.encrypt(b'A'*radicalsize))
+
+    guess_chars = b''
+    for working_block in range(1, working_block_number):
+        padding = b'A' * (radicalsize + blocksize - 1)
+        for j in range(blocksize):
+            attack_dict = dict()
+            append_padding = padding[j:]
+            for i in range(2 ** 8):
+                current_append_padding = append_padding + guess_chars + bytes([i])
+                cipherblock_i = oracle.encrypt(current_append_padding)[
+                                working_block * blocksize:blocksize * (1 + working_block)]
+                attack_dict[cipherblock_i] = bytes([i])
+            cible_cipherblok = oracle.encrypt(append_padding)[
+                               working_block * blocksize:blocksize * (1 + working_block)]
+            guess_char = attack_dict.get(cible_cipherblok, None)
+            if guess_char is None:
+                return guess_chars
+            guess_chars += guess_char
+    return guess_chars
+
 # guess_chars = attack_on_ECB_harder()
-# print()
+# print(guess_chars.decode())
 
 
 class Oracle_CBC():
@@ -359,6 +343,7 @@ class Oracle_CBC():
         aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq
         dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg
         YnkK'''))
+
 
 def attack_on_CBC():
     oracle_cbc = Oracle_CBC()
@@ -387,8 +372,8 @@ def attack_on_CBC():
             guess_chars += guess_char
         # message = xor(guess_chars, last_cipherblock)
 
-            # print(guess_char.decode(), end = '')
+        # print(guess_char.decode(), end = '')
 
     return guess_chars
 
-attack_on_CBC()
+guess_chars = attack_on_CBC()
