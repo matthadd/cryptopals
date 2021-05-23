@@ -1,6 +1,6 @@
 import random
 
-from set_1 import *
+from set1 import *
 import os
 import random as rd
 from Cryptodome.Cipher import AES
