@@ -1,9 +1,6 @@
-import random
-
-from set1 import *
+from set_1 import *
 import os
-import random as rd
-from Cryptodome.Cipher import AES
+from Crypto.Cipher import AES
 import json
 
 blocksize = 16
@@ -25,10 +22,14 @@ def pkcs7(plaintext, blocksize=16):
 
 
 def strip_pkcs7(plaintext, blocksize=16):
+    class BadPadding(Exception):
+        def __init__(self):
+            super(BadPadding, self).__init__('PKCS#7 padding not valid')
+
     possible_padding = plaintext[-1]
     for i in range(1, possible_padding + 1):
         if plaintext[-i] != possible_padding:
-            return False
+            raise BadPadding
     return plaintext[:-possible_padding]
 
 
@@ -213,7 +214,7 @@ def deparsing_routine(dico):
 def profile_for(input_string, key=b'YELLOW SUBMARINE'):
     washup_string = []
     for char in input_string:
-        if char is not b'&' and char is not b'=':
+        if char != b'&' and char != b'=':
             washup_string.append(char)
     washup_string = bytes(washup_string)
 
@@ -305,9 +306,9 @@ def attack_on_ECB_harder():
     radicalsize = 0
     while oracle.encrypt(b'A' * radicalsize)[:blocksize] != oracle.encrypt(b'A' * (radicalsize + 1))[:blocksize]:
         radicalsize += 1
-    #radicalsize = (blocksize - radicalsize) % blocksize
+    # radicalsize = (blocksize - radicalsize) % blocksize
 
-    working_block_number = len(oracle.encrypt(b'A'*radicalsize))
+    working_block_number = len(oracle.encrypt(b'A' * radicalsize))
 
     guess_chars = b''
     for working_block in range(1, working_block_number):
@@ -327,6 +328,7 @@ def attack_on_ECB_harder():
                 return guess_chars
             guess_chars += guess_char
     return guess_chars
+
 
 # guess_chars = attack_on_ECB_harder()
 # print(guess_chars.decode())
@@ -356,6 +358,7 @@ def attack_on_CBC():
     for working_block in range(working_block_number):
         padding = b'A' * (blocksize - 1)
         for j in range(blocksize):
+            guess_chars_block = b''
             attack_dict = dict()
             append_padding = padding[j:]
             for i in range(2 ** 8):
@@ -369,11 +372,61 @@ def attack_on_CBC():
             guess_char = attack_dict.get(cible_cipherblok, None)
             if guess_char is None:
                 return guess_chars
-            guess_chars += guess_char
+            guess_chars_block += guess_char
+        guess_chars += guess_chars_block
         # message = xor(guess_chars, last_cipherblock)
 
         # print(guess_char.decode(), end = '')
 
     return guess_chars
 
+
+def decrypt_token(token):
+    token = AES_decrypt_CBC(key, token)
+    for element in token.split(b';'):
+        if element[:len(b'admin=true')] == b'admin=true':
+            return True
+    return False
+
+
 guess_chars = attack_on_CBC()
+print(guess_chars)
+
+
+def get_token(input_bytes):
+    input_bytes = b"comment1=cooking%20MCs;userdata=" + input_bytes.replace(b'=', b"\"=\"").replace(b';',
+                                                                                                    b"\";\"") + b";comment2=%20like%20a%20pound%20of%20bacon"
+    return AES_encrypt_CBC(key, input_bytes)
+
+
+token = get_token(b'')
+print(token.hex())
+
+
+def tampering(token, force_input=b'admin=true;'):
+    res = {}
+    print('[+] Cipher:', [(i // 16, token[i:i + blocksize]) for i in range(0, len(token), blocksize)])
+    print('[+] Bitflipp in ciphertext ...')
+    btoken = bytearray(token)
+    btoken = [btoken[i:i + blocksize] for i in range(0, len(btoken), blocksize)]
+
+    count = 1
+    for input_byte, format_byte in zip(force_input, b"comment2=%2"):
+        B = btoken[1][count]  # cipher token value at precedent block
+        C = format_byte  # C = ord(b'c')  # decrypt token value at 1,1
+        print(chr(B), chr(C), chr(input_byte))
+        btoken[1][count] = B ^ C ^ input_byte  # B^C is decrypt(encrypt(block))
+        count += 1
+
+    token = b''
+    for i in range(len(btoken)):
+        token += bytes(btoken[i])
+    return token
+    token = AES_decrypt_CBC(key, token)
+    print('[+] Clear:', [(i // 16, token[i:i + blocksize]) for i in range(0, len(token), blocksize)])
+    print(token[blocksize:])
+    print(token[2 * blocksize + 1])
+
+
+token = tampering(token)
+print(decrypt_token(token))

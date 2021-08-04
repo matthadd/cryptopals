@@ -116,7 +116,7 @@ def hamming_distance(input_bytes_1, input_bytes_2):
     xor_bytes = xor(input_bytes_1, input_bytes_2)
     distance = 0
     for byte in xor_bytes:
-        distance += sum([1 for bit in bin(byte) if bit is '1'])
+        distance += sum([1 for bit in bin(byte) if bit == '1'])
     return distance
 
 
@@ -127,31 +127,118 @@ f = open('6.txt', 'r')
 cipher = base64.b64decode(f.read())
 f.close()
 
-chunks = []
-res = []
-distances = {}
 
-for keysize in range(2, 41):
-    chunks = [cipher[i:i + keysize] for i in range(0, len(cipher), keysize)]
+def break_repeating_xor(cipher):
+    chunks = []
     res = []
-    for i in range(len(chunks) - 1):
-        res.append(hamming_distance(chunks[i], chunks[i + 1]) / keysize)
-    distances[keysize] = sum(res) / len(res)
+    distances = {}
 
-possible_key_length = sorted(distances.items(), key=lambda item: item[1])
-# print(possible_key_length[0])
-keysize = possible_key_length[0][0]
+    for keysize in range(2, 41):
+        chunks = [cipher[i:i + keysize] for i in range(0, len(cipher), keysize)]
+        res = []
+        for i in range(len(chunks) - 1):
+            res.append(hamming_distance(chunks[i], chunks[i + 1]) / keysize)
+        distances[keysize] = sum(res) / len(res)
 
-key = b''
-block = []
-for i in range(keysize):
+    possible_key_length = sorted(distances.items(), key=lambda item: item[1])
+    # print(possible_key_length[0])
+    keysize = possible_key_length[0][0]
+
+    key = b''
     block = []
-    for j in range(i, len(cipher), keysize):
-        block.append(cipher[j])
-    guess_char = break_single_char_xor(block)
-    key += bytes([guess_char])
+    for i in range(keysize):
+        block = []
+        for j in range(i, len(cipher), keysize):
+            block.append(cipher[j])
+        guess_char = break_single_char_xor(block)
+        key += bytes([guess_char])
 
-plaintext = repeating_xor(cipher, key)
+    return key
+
+
+# key = break_repeating_xor(cipher)
+#
+# plaintext = repeating_xor(cipher, key)
 # print(key.decode())
 # print()
 # print(plaintext.decode())
+
+# CHALLENGE 7
+
+from Crypto.Cipher import AES
+
+f = open('7.txt', 'r')
+ciphertext = base64.b64decode(f.read())
+f.close()
+
+key = b"YELLOW SUBMARINE"
+
+
+def AES_ECB(key, ciphertext):
+    cipher = AES.new(key, AES.MODE_ECB)
+    plaintext = cipher.decrypt(ciphertext)
+    return plaintext
+
+
+plaintext = AES_ECB(key, ciphertext[0:16])
+
+# print(plaintext.decode())
+
+# CHALLENGE 8
+
+f = open('8.txt', 'r')
+lines = []
+for line in f:
+    lines.append(bytes.fromhex(line))
+f.close()
+
+count = 0
+block_size = 16
+for line in lines:
+    chunk = [line[i:i + block_size] for i in range(0, len(line), block_size)]
+    for i in range(len(chunk)):
+        for j in range(i, len(chunk)):
+            if chunk[i] == chunk[j] and i is not j:
+                guess = count
+                # print(count, i, j, chunk[i], chunk[j])
+    count += 1
+
+
+# print(guess, lines[guess][0:16])
+
+def replace(L, a, b):
+    for i in range(len(L)):
+        if L[i] == a:
+            L[i] = b
+
+
+def key_generator(L, lmin, lmax):
+    """take key n-1 return key n"""
+    if sum(L) == len(L) * lmax:
+        return True
+
+    L[-1] += 1
+    for i in range(-1, -len(L) - 1, -1):
+        if L[i] > lmax:
+            L[i] = lmin
+            L[i - 1] += 1
+
+
+ciphertext = lines[guess]
+plaintext = []
+scores = []
+
+start = 64  # 64 -> 32 to have space
+end = 90
+length = 16
+L = [start] * length
+
+# while key_generator(L, start, end) is not True:
+#     replace(L, 64, 32)
+#     key = bytes(L)
+#     text = AES_ECB(key, ciphertext)
+#     plaintext.append(text)
+#     scores.append(scoring(text))
+#     print(key, text)
+#     print(scores.index(max(scores)))
+#     replace(L, 32, 64)
